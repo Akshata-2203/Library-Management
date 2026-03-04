@@ -22,13 +22,12 @@ const StaffDashboard: React.FC = () => {
         </div>
 
         {/* Back to Public Search */}
-       <button
-          onClick={() => navigate("/")}
-          className="bg-white border border-slate-200 px-5 py-2 rounded-xl 
-          text-sm font-semibold text-slate-700 hover:bg-slate-100 
-          transition shadow-sm"
+        <button
+          onClick={() => navigate("/staff-dashboard")}
+          className="flex items-center gap-2 bg-violet-600 text-white px-5 py-2 rounded-xl font-semibold hover:bg-violet-700 transition shadow-md"
         >
-          ← Back to Search
+          <i className="fas fa-arrow-left"></i>
+          Search
         </button>
       </div>
 
