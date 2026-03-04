@@ -118,7 +118,7 @@ const StaffHistory: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100">
 
       {/* Header */}
       <div className="flex justify-between items-center px-8 pt-10 pb-4 max-w-7xl mx-auto">

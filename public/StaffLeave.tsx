@@ -8,6 +8,7 @@ const StaffLeave: React.FC = () => {
   const navigate = useNavigate();
 
   const [staffList, setStaffList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // Main form data
   const [formData, setFormData] = useState({
@@ -83,6 +84,8 @@ const StaffLeave: React.FC = () => {
     }
 
     try {
+      setLoading(true);
+
       for (let row of rows) {
         if (row.className && row.hour && row.replacementEmail) {
 
@@ -114,11 +117,14 @@ const StaffLeave: React.FC = () => {
       }
 
       alert("Leave Applied & Emails Sent Successfully 💌");
+
       navigate("/staff-dashboard");
 
     } catch (error) {
       console.error("Error:", error);
       alert("Something went wrong. Try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -181,7 +187,7 @@ const StaffLeave: React.FC = () => {
         {/* 4 Rows */}
         {rows.map((row, index) => (
           <div key={index} className="grid grid-cols-3 gap-4 mb-4">
-            
+
             {/* Class */}
             <select
               value={row.className}
@@ -233,12 +239,27 @@ const StaffLeave: React.FC = () => {
           </div>
         ))}
 
+        {/* Submit Button */}
         <button
           onClick={handleSubmit}
-          className="w-full bg-violet-600 text-white py-3 rounded-xl text-lg font-semibold hover:bg-violet-700 transition-all shadow-md"
+          disabled={loading}
+          className={`w-full py-3 rounded-xl text-lg font-semibold transition-all shadow-md
+          ${
+            loading
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-violet-600 hover:bg-violet-700 text-white"
+          }`}
         >
-          Apply Leave →
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <i className="fas fa-spinner fa-spin"></i>
+              Sending Email...
+            </span>
+          ) : (
+            "Apply Leave →"
+          )}
         </button>
+
       </div>
     </div>
   );
