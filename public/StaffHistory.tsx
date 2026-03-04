@@ -9,6 +9,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
 import { useNavigate } from "react-router-dom";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 
 interface LeaveRecord {
   id: string;
@@ -32,8 +33,12 @@ interface GroupedLeave {
 
 const StaffHistory: React.FC = () => {
   const navigate = useNavigate();
+
   const [history, setHistory] = useState<GroupedLeave[]>([]);
   const [search, setSearch] = useState("");
+
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     const fetchLeaveHistory = async () => {
@@ -87,19 +92,21 @@ const StaffHistory: React.FC = () => {
     fetchLeaveHistory();
   }, []);
 
-  const handleDelete = async (id: string) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this leave record?"
-    );
+  const handleDeleteClick = (id: string) => {
+    setDeleteId(id);
+    setShowDeleteModal(true);
+  };
 
-    if (!confirmDelete) return;
+  const confirmDelete = async () => {
+    if (!deleteId) return;
 
     try {
-      await deleteDoc(doc(db, "staffLeaveRequests", id));
+      await deleteDoc(doc(db, "staffLeaveRequests", deleteId));
 
-      setHistory((prev) => prev.filter((record) => record.id !== id));
+      setHistory((prev) => prev.filter((r) => r.id !== deleteId));
 
-      alert("Leave record deleted successfully");
+      setShowDeleteModal(false);
+      setDeleteId(null);
     } catch (error) {
       console.error(error);
       alert("Error deleting record");
@@ -153,15 +160,11 @@ const StaffHistory: React.FC = () => {
           </div>
         </div>
 
-        {/* Table Card */}
+        {/* Table */}
         <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
 
-          {/* Table Header */}
-          <div
-            className="grid grid-cols-[1.3fr_1fr_0.7fr_2fr_0.3fr] 
-            px-8 py-5 bg-slate-50 text-xs font-semibold 
-            text-slate-500 uppercase tracking-wider"
-          >
+          <div className="grid grid-cols-[1.3fr_1fr_0.7fr_2fr_0.3fr] 
+          px-8 py-5 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
             <span>Staff</span>
             <span>Date</span>
             <span>Day</span>
@@ -169,7 +172,6 @@ const StaffHistory: React.FC = () => {
             <span></span>
           </div>
 
-          {/* Table Body */}
           {filteredHistory.length === 0 ? (
             <div className="px-8 py-16 text-center text-slate-400">
               No leave history found.
@@ -179,10 +181,8 @@ const StaffHistory: React.FC = () => {
               <div
                 key={record.id}
                 className="grid grid-cols-[1.3fr_1fr_0.7fr_2fr_0.3fr] 
-                px-8 py-6 border-t border-slate-100 
-                hover:bg-slate-50 transition-all items-start"
+                px-8 py-6 border-t border-slate-100 hover:bg-slate-50 transition-all"
               >
-                {/* Staff */}
                 <div>
                   <p className="font-semibold text-slate-800">
                     {record.staffName}
@@ -192,61 +192,39 @@ const StaffHistory: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Date */}
                 <div className="text-slate-700 font-medium">
                   {record.leaveDate}
                 </div>
 
-                {/* Day Order */}
                 <div>
-                  <span
-                    className="inline-flex items-center 
-                    justify-center bg-violet-100 
-                    text-violet-700 text-xs font-semibold 
-                    px-3 py-1 rounded-full"
-                  >
+                  <span className="bg-violet-100 text-violet-700 text-xs font-semibold px-3 py-1 rounded-full">
                     {record.dayOrder}
                   </span>
                 </div>
 
-                {/* Replacements */}
                 <div className="flex flex-wrap gap-2">
-                  {record.combinedReplacements ? (
-                    record.combinedReplacements
-                      .split(", ")
-                      .map((item, i) => {
-                        const [hour, name] = item.split(" – ");
-                        return (
-                          <div
-                            key={i}
-                            className="flex items-center gap-2 
-                            bg-violet-50 border border-violet-100 
-                            text-violet-700 px-3 py-1.5 
-                            rounded-full text-xs font-medium"
-                          >
-                            <span
-                              className="bg-violet-600 text-white 
-                              text-[10px] px-2 py-0.5 rounded-full"
-                            >
-                              {hour}
-                            </span>
-                            <span>{name}</span>
-                          </div>
-                        );
-                      })
-                  ) : (
-                    <span className="text-slate-400 text-sm">
-                      No replacements
-                    </span>
-                  )}
+                  {record.combinedReplacements
+                    .split(", ")
+                    .map((item, i) => {
+                      const [hour, name] = item.split(" – ");
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 bg-violet-50 border border-violet-100 text-violet-700 px-3 py-1.5 rounded-full text-xs font-medium"
+                        >
+                          <span className="bg-violet-600 text-white text-[10px] px-2 py-0.5 rounded-full">
+                            {hour}
+                          </span>
+                          <span>{name}</span>
+                        </div>
+                      );
+                    })}
                 </div>
 
-                {/* Delete Button */}
                 <div className="flex justify-end">
                   <button
-                    onClick={() => handleDelete(record.id)}
+                    onClick={() => handleDeleteClick(record.id)}
                     className="text-red-500 hover:text-red-700 text-lg transition"
-                    title="Delete Record"
                   >
                     <i className="fas fa-trash"></i>
                   </button>
@@ -256,6 +234,12 @@ const StaffHistory: React.FC = () => {
           )}
         </div>
       </div>
+
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 };
