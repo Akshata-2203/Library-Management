@@ -2,26 +2,30 @@ import React, { useEffect, useState } from "react";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
 import { useNavigate } from "react-router-dom";
-import LeaveReceiptModal from "../components/LeaveReceiptModal";
 
 interface LeaveRecord {
   id: string;
   staffName: string;
   leaveDate: string;
   dayOrder: string;
-  hour: string;
-  replacement: string;
   email: string;
+  hour?: string;
+  replacement?: string;
+  replacements?: any[];
+}
+
+interface GroupedLeave {
+  staffName: string;
+  leaveDate: string;
+  dayOrder: string;
+  email: string;
+  combinedReplacements: string;
 }
 
 const StaffHistory: React.FC = () => {
   const navigate = useNavigate();
-  const [history, setHistory] = useState<LeaveRecord[]>([]);
+  const [history, setHistory] = useState<GroupedLeave[]>([]);
   const [search, setSearch] = useState("");
-
-  // ⭐ Modal State
-  const [selectedRecord, setSelectedRecord] = useState<LeaveRecord | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchLeaveHistory = async () => {
@@ -31,12 +35,47 @@ const StaffHistory: React.FC = () => {
       );
 
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({
+      const rawData = snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...(doc.data() as Omit<LeaveRecord, "id">),
+        ...(doc.data() as LeaveRecord),
       }));
 
-      setHistory(data);
+      const grouped: { [key: string]: GroupedLeave } = {};
+
+      rawData.forEach((record) => {
+        const key = `${record.staffName}-${record.leaveDate}`;
+
+        if (!grouped[key]) {
+          grouped[key] = {
+            staffName: record.staffName,
+            leaveDate: record.leaveDate,
+            dayOrder: record.dayOrder,
+            email: record.email,
+            combinedReplacements: "",
+          };
+        }
+
+        // New structure (array)
+        if (record.replacements && record.replacements.length > 0) {
+          const repText = record.replacements
+            .map((r) => `${r.hour} – ${r.replacement}`)
+            .join(", ");
+
+          grouped[key].combinedReplacements = repText;
+        }
+
+        // Old structure (single hour)
+        else if (record.hour && record.replacement) {
+          const newEntry = `${record.hour} – ${record.replacement}`;
+
+          grouped[key].combinedReplacements =
+            grouped[key].combinedReplacements
+              ? grouped[key].combinedReplacements + ", " + newEntry
+              : newEntry;
+        }
+      });
+
+      setHistory(Object.values(grouped));
     };
 
     fetchLeaveHistory();
@@ -46,126 +85,136 @@ const StaffHistory: React.FC = () => {
     record.staffName?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // 🧾 Open Receipt Modal (NO navigation)
-  const handleReceiptClick = (record: LeaveRecord) => {
-    setSelectedRecord(record);
-    setIsModalOpen(true);
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       
-      {/* ⭐ Top Header with Proper Back Button */}
-      <div className="flex justify-between items-center px-8 pt-8 pb-2 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex justify-between items-center px-8 pt-10 pb-4 max-w-7xl mx-auto">
         <div>
-          <h1 className="text-3xl font-bold text-slate-800">
+          <h1 className="text-3xl font-bold text-slate-800 tracking-tight">
             Leave History
           </h1>
-          <p className="text-slate-500 mt-1">
-            Manage leave applications and view digital receipts
+          <p className="text-slate-500 mt-1 text-sm">
+            View leave applications and assigned replacements
           </p>
         </div>
 
-        {/* 🔙 Back to Staff Dashboard Button */}
         <button
           onClick={() => navigate("/staff-dashboard")}
-          className="flex items-center gap-2 bg-violet-600 text-white px-5 py-2 rounded-xl font-semibold hover:bg-violet-700 transition shadow-md"
+          className="flex items-center gap-2 bg-violet-600 text-white 
+          px-5 py-2.5 rounded-xl font-semibold 
+          hover:bg-violet-700 transition-all shadow-md hover:shadow-lg"
         >
           <i className="fas fa-arrow-left"></i>
           Dashboard
         </button>
       </div>
 
-      {/* Page Container */}
-      <div className="p-8 pt-4 max-w-7xl mx-auto">
+      <div className="px-8 pb-12 max-w-7xl mx-auto">
 
-        {/* 🔍 Smart Search Bar */}
-        <div className="mb-6">
-          <div className="relative max-w-xl">
-            <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+        {/* Search */}
+        <div className="mb-8">
+          <div className="relative max-w-md">
             <input
               type="text"
-              placeholder="Quick search staff..."
+              placeholder="Search staff name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 
-              bg-white shadow-sm focus:outline-none focus:ring-2 
-              focus:ring-violet-500 focus:border-violet-500"
+              className="w-full px-5 py-3 rounded-xl border border-slate-200 
+              bg-white shadow-sm focus:outline-none 
+              focus:ring-2 focus:ring-violet-500 
+              focus:border-violet-500 transition"
             />
           </div>
         </div>
 
-        {/* 📊 Premium Table Card (Matches Your UI Screenshot) */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          
+        {/* Table Card */}
+        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+
           {/* Table Header */}
-          <div className="grid grid-cols-5 px-6 py-4 bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider">
-            <span>Staff Name</span>
-            <span>Leave Date</span>
-            <span>Day Order</span>
-            <span>Hour</span>
-            <span className="text-right">Receipt</span>
+          <div className="grid grid-cols-[1.3fr_1fr_0.7fr_2fr] 
+            px-8 py-5 bg-slate-50 text-xs font-semibold 
+            text-slate-500 uppercase tracking-wider">
+            <span>Staff</span>
+            <span>Date</span>
+            <span>Day</span>
+            <span>Assigned Replacements</span>
           </div>
 
           {/* Table Body */}
           {filteredHistory.length === 0 ? (
-            <div className="px-6 py-12 text-center text-slate-500">
+            <div className="px-8 py-16 text-center text-slate-400">
               No leave history found.
             </div>
           ) : (
-            filteredHistory.map((record) => (
+            filteredHistory.map((record, index) => (
               <div
-                key={record.id}
-                className="grid grid-cols-5 px-6 py-5 border-t border-slate-100 
-                hover:bg-slate-50 transition-all items-center"
+                key={index}
+                className="grid grid-cols-[1.3fr_1fr_0.7fr_2fr] 
+                px-8 py-6 border-t border-slate-100 
+                hover:bg-slate-50 transition-all items-start"
               >
-                {/* Staff Name */}
+                {/* Staff */}
                 <div>
                   <p className="font-semibold text-slate-800">
                     {record.staffName}
                   </p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-400 mt-1">
                     {record.email}
                   </p>
                 </div>
 
-                {/* Leave Date */}
-                <span className="text-slate-600 font-medium">
+                {/* Date */}
+                <div className="text-slate-700 font-medium">
                   {record.leaveDate}
-                </span>
-
-                {/* Day Order */}
-                <span className="text-slate-600">
-                  {record.dayOrder}
-                </span>
-
-                {/* Hour */}
-                <span className="text-slate-600">
-                  {record.hour}
-                </span>
-
-                {/* 🧾 Receipt Icon (Opens Modal, NOT Route) */}
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => handleReceiptClick(record)}
-                    className="text-violet-500 hover:text-violet-700 transition text-xl"
-                    title="View Receipt"
-                  >
-                    <i className="fas fa-receipt"></i>
-                  </button>
                 </div>
+
+                {/* Day Order Badge */}
+                <div>
+                  <span className="inline-flex items-center 
+                    justify-center bg-violet-100 
+                    text-violet-700 text-xs font-semibold 
+                    px-3 py-1 rounded-full">
+                    {record.dayOrder}
+                  </span>
+                </div>
+
+                {/* Replacements */}
+                <div className="flex flex-wrap gap-2">
+                  {record.combinedReplacements ? (
+                    record.combinedReplacements
+                      .split(", ")
+                      .map((item, i) => {
+                        const [hour, name] = item.split(" – ");
+                        return (
+                          <div
+                            key={i}
+                            className="flex items-center gap-2 
+                            bg-violet-50 border border-violet-100 
+                            text-violet-700 px-3 py-1.5 
+                            rounded-full text-xs font-medium 
+                            hover:bg-violet-100 transition"
+                          >
+                            <span className="bg-violet-600 text-white 
+                              text-[10px] px-2 py-0.5 rounded-full">
+                              {hour}
+                            </span>
+                            <span>{name}</span>
+                          </div>
+                        );
+                      })
+                  ) : (
+                    <span className="text-slate-400 text-sm">
+                      No replacements
+                    </span>
+                  )}
+                </div>
+
               </div>
             ))
           )}
         </div>
       </div>
-
-      {/* 🧾 Receipt Modal (Connected Properly) */}
-      <LeaveReceiptModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        record={selectedRecord}
-      />
     </div>
   );
 };
