@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
 import { useNavigate } from "react-router-dom";
 
@@ -15,6 +22,7 @@ interface LeaveRecord {
 }
 
 interface GroupedLeave {
+  id: string;
   staffName: string;
   leaveDate: string;
   dayOrder: string;
@@ -35,6 +43,7 @@ const StaffHistory: React.FC = () => {
       );
 
       const snapshot = await getDocs(q);
+
       const rawData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...(doc.data() as LeaveRecord),
@@ -47,6 +56,7 @@ const StaffHistory: React.FC = () => {
 
         if (!grouped[key]) {
           grouped[key] = {
+            id: record.id,
             staffName: record.staffName,
             leaveDate: record.leaveDate,
             dayOrder: record.dayOrder,
@@ -55,17 +65,13 @@ const StaffHistory: React.FC = () => {
           };
         }
 
-        // New structure (array)
         if (record.replacements && record.replacements.length > 0) {
           const repText = record.replacements
             .map((r) => `${r.hour} – ${r.replacement}`)
             .join(", ");
 
           grouped[key].combinedReplacements = repText;
-        }
-
-        // Old structure (single hour)
-        else if (record.hour && record.replacement) {
+        } else if (record.hour && record.replacement) {
           const newEntry = `${record.hour} – ${record.replacement}`;
 
           grouped[key].combinedReplacements =
@@ -81,13 +87,32 @@ const StaffHistory: React.FC = () => {
     fetchLeaveHistory();
   }, []);
 
+  const handleDelete = async (id: string) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this leave record?"
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      await deleteDoc(doc(db, "staffLeaveRequests", id));
+
+      setHistory((prev) => prev.filter((record) => record.id !== id));
+
+      alert("Leave record deleted successfully");
+    } catch (error) {
+      console.error(error);
+      alert("Error deleting record");
+    }
+  };
+
   const filteredHistory = history.filter((record) =>
     record.staffName?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      
+
       {/* Header */}
       <div className="flex justify-between items-center px-8 pt-10 pb-4 max-w-7xl mx-auto">
         <div>
@@ -132,13 +157,16 @@ const StaffHistory: React.FC = () => {
         <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
 
           {/* Table Header */}
-          <div className="grid grid-cols-[1.3fr_1fr_0.7fr_2fr] 
+          <div
+            className="grid grid-cols-[1.3fr_1fr_0.7fr_2fr_0.3fr] 
             px-8 py-5 bg-slate-50 text-xs font-semibold 
-            text-slate-500 uppercase tracking-wider">
+            text-slate-500 uppercase tracking-wider"
+          >
             <span>Staff</span>
             <span>Date</span>
             <span>Day</span>
             <span>Assigned Replacements</span>
+            <span></span>
           </div>
 
           {/* Table Body */}
@@ -147,10 +175,10 @@ const StaffHistory: React.FC = () => {
               No leave history found.
             </div>
           ) : (
-            filteredHistory.map((record, index) => (
+            filteredHistory.map((record) => (
               <div
-                key={index}
-                className="grid grid-cols-[1.3fr_1fr_0.7fr_2fr] 
+                key={record.id}
+                className="grid grid-cols-[1.3fr_1fr_0.7fr_2fr_0.3fr] 
                 px-8 py-6 border-t border-slate-100 
                 hover:bg-slate-50 transition-all items-start"
               >
@@ -169,12 +197,14 @@ const StaffHistory: React.FC = () => {
                   {record.leaveDate}
                 </div>
 
-                {/* Day Order Badge */}
+                {/* Day Order */}
                 <div>
-                  <span className="inline-flex items-center 
+                  <span
+                    className="inline-flex items-center 
                     justify-center bg-violet-100 
                     text-violet-700 text-xs font-semibold 
-                    px-3 py-1 rounded-full">
+                    px-3 py-1 rounded-full"
+                  >
                     {record.dayOrder}
                   </span>
                 </div>
@@ -192,11 +222,12 @@ const StaffHistory: React.FC = () => {
                             className="flex items-center gap-2 
                             bg-violet-50 border border-violet-100 
                             text-violet-700 px-3 py-1.5 
-                            rounded-full text-xs font-medium 
-                            hover:bg-violet-100 transition"
+                            rounded-full text-xs font-medium"
                           >
-                            <span className="bg-violet-600 text-white 
-                              text-[10px] px-2 py-0.5 rounded-full">
+                            <span
+                              className="bg-violet-600 text-white 
+                              text-[10px] px-2 py-0.5 rounded-full"
+                            >
                               {hour}
                             </span>
                             <span>{name}</span>
@@ -210,6 +241,16 @@ const StaffHistory: React.FC = () => {
                   )}
                 </div>
 
+                {/* Delete Button */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => handleDelete(record.id)}
+                    className="text-red-500 hover:text-red-700 text-lg transition"
+                    title="Delete Record"
+                  >
+                    <i className="fas fa-trash"></i>
+                  </button>
+                </div>
               </div>
             ))
           )}
